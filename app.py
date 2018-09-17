@@ -9,6 +9,36 @@ Complete project details: http://randomnerdtutorials.com
 import time
 import RPi.GPIO as GPIO
 from flask import Flask, render_template, request
+from threading import Thread, Event
+
+class LoopThread(Thread):
+    def __init__(self, stop_event, interrupt_event):
+        self.stop_event = stop_event
+        self.interrupt_event = interrupt_event
+        Thread.__init__(self)
+
+    def run(self):
+        while not self.stop_event.is_set():
+            self.loop_process()
+            if self.interrupt_event.is_set():
+                self.interrupted_process()
+                self.interrupt_event.clear()
+
+    def loop_process(self):
+		for pin in pins:
+ 			GPIO.output(pin, GPIO.HIGH)
+			time.sleep(1)
+			GPIO.output(pin,GPIO.LOW)
+
+    def interrupted_process(self):
+        print("Interrupted!")
+
+STOP_EVENT = Event()
+INTERRUPT_EVENT = Event()
+thread = LoopThread(STOP_EVENT, INTERRUPT_EVENT)
+
+
+
 app = Flask(__name__)
 
 GPIO.setmode(GPIO.BCM)
@@ -64,36 +94,37 @@ def action(changePin, action):
    }
 #
    return render_template('main.html', **templateData)
+
 @app.route("/timer")
 def startloop():
-   toasts=0
-   while (toasts ==0):
-		for pin in pins:
- 			GPIO.output(pin, GPIO.HIGH)
-			time.sleep(1)
-			GPIO.output(pin,GPIO.LOW)
+	thread.start()
 
-  #		deviceName = pins[changePin]['name']
-   # If the action part of the URL is "on," execute the code indented below:
-   #		if action == "on":
-   	   # Set the pin high:
-    #	  GPIO.output(changePin, GPIO.HIGH)
-      # Save the status message to be passed into the template:
-   #	   message = "Turned " + deviceName + " on."
-   #	if action == "off":
-    #	  GPIO.output(changePin, GPIO.LOW)
-    #	  message = "Turned " + deviceName + " off."
+def shutdown_server():
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        raise RuntimeError('Not running with the Werkzeug Server')
+    func()
 
-   # For each pin, read the pin state and store it in the pins dictionary:
-   for pin in pins:
-    	  pins[pin]['state'] = GPIO.input(pin)
 
-   # Along with the pin dictionary, put the message into the template data dictionary:
-   templateData = {
-    	  'pins' : pins
-  	 }
+@app.route("/shutdown")
+def shutdown():
+    STOP_EVENT.set()
+    thread.join()
+    shutdown_server()
+    return "OK", 200
 
-   return render_template('main.html', **templateData)
+@app.route("/interrupt")
+def interrupt():
+    INTERRUPT_EVENT.set()
+    STOP_EVENT.set()
+    thread.join()
+#    shutdown_server()
+    templateData = {
+      'pins' : pins
+   }
+#
+    return render_template('main.html', **templateData)
+
 
 
 if __name__ == "__main__":

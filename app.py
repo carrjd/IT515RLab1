@@ -62,7 +62,7 @@ def action(changePin, action):
    templateData = {
       'pins' : pins
    }
-
+#
    return render_template('main.html', **templateData)
 @app.route("/timer")
 def startloop():

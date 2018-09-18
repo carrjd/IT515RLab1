@@ -98,6 +98,9 @@ def action(changePin, action):
 @app.route("/timer")
 def startloop():
 	thread.start()
+	templateData = {'pins' : pins}
+	return render_template('main.html', **templateData)
+
 
 def shutdown_server():
     func = request.environ.get('werkzeug.server.shutdown')
@@ -111,7 +114,11 @@ def shutdown():
     STOP_EVENT.set()
     thread.join()
     shutdown_server()
-    return "OK", 200
+    templateData = {
+      'pins' : pins
+   }
+#
+    return render_template('main.html', **templateData)
 
 @app.route("/interrupt")
 def interrupt():
